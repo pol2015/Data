@@ -1,0 +1,189 @@
+# Required libraries
+
+```{r, echo=TRUE}
+#install.packages("dplyr")
+library(dplyr)
+#install.packages("devtools")
+library(devtools)
+#install_github("easyGgplot2", "kassambara")
+library(easyGgplot2)
+library(ggplot2)
+source("http://peterhaschke.com/Code/multiplot.R")
+setwd("C:/Users/Pol/Documents/R")
+```
+
+# Code for reading in the dataset and/or processing the data
+
+```{r, echo=TRUE}
+data <- read.csv("C:/Users/Pol/Documents/R/activity.csv")
+str(data)
+dim(data)
+```
+
+
+# Histogram of the total number of steps taken each day
+
+NA entries removed in the new dataset named **data_steps_yes** 
+
+```{r, echo=TRUE}
+data_steps_yes <- data[!is.na(data$steps),]
+data_steps_na <- data[is.na(data$steps),]
+nrow(data) == nrow(data_steps_yes) + nrow(data_steps_na)
+
+data_steps_yes_perday <- group_by(data_steps_yes, date)
+data_steps_yes_perday <- summarise(data_steps_yes_perday,sum_steps = sum(steps))
+data_steps_yes_perday$date <- as.Date(data_steps_yes_perday$date)
+
+ggplot(data_steps_yes_perday,aes(x=date,y=sum_steps)) + 
+  geom_bar(colour="black", fill="#DD8888", width=.4,stat="identity") +
+  guides(fill=FALSE) +
+  xlab("Date") + ylab("Total Steps") +
+  ggtitle("Histogram")
+```  
+  
+
+# Mean and median number of steps taken each day
+
+```{r, echo=TRUE}
+data_steps_yes_perday_M <- group_by(data_steps_yes, date)
+data_steps_yes_perday_M <- summarise(data_steps_yes_perday_M,M_steps = mean(steps))
+data_steps_yes_perday_M$date <- as.Date(data_steps_yes_perday_M$date)
+
+data_steps_yes_perday_MD <- group_by(data_steps_yes, date)
+data_steps_yes_perday_MD <- summarise(data_steps_yes_perday_MD,MD_steps = median(steps))
+data_steps_yes_perday_MD$date <- as.Date(data_steps_yes_perday_MD$date)
+
+summary(data_steps_yes_perday_M)
+head(data_steps_yes_perday_M)
+
+summary(data_steps_yes_perday_MD)
+head(data_steps_yes_perday_MD)
+
+```  
+
+
+# Time series plot of the average number of steps taken
+```{r, echo=TRUE}
+data_steps_yes_interval_M <- group_by(data_steps_yes, interval)
+data_steps_yes_interval_M <- summarise(data_steps_yes_interval_M,M_int = mean(steps))
+
+ggplot(data_steps_yes_interval_M,aes(x=interval,y=M_int)) + 
+  geom_line(colour="gray55", linetype="solid", size=1) + 
+    xlab("Interval") + ylab("Average Steps") +
+  ggtitle("Time Series") 
+```  
+
+
+# The 5-minute interval that, on average, contains the maximum number of steps
+
+```{r, echo=TRUE}
+data_steps_yes_interval_M_max <- data_steps_yes_interval_M[data_steps_yes_interval_M$M_int == max(data_steps_yes_interval_M$M_int),]
+data_steps_yes_interval_M_max
+```
+Interval with max number of steps is **`r data_steps_yes_interval_M_max[1]`**
+
+
+
+# Code to describe and show a strategy for imputing missing data
+
+Use **data_steps_yes_interval_M** dataset for intervals with missing data and later append results to the  original dataset **data_steps_yes** where NA has been removed 
+
+```{r, echo=TRUE}
+data_steps_na_filled <- merge(data_steps_na,data_steps_yes_interval_M,by = "interval")
+data_steps_na_filled <- data_steps_na_filled[-c(2)]
+data_steps_na_filled <- data_steps_na_filled[c(3,2,1)]
+colnames(data_steps_na_filled)[1] <- "steps"
+
+data_steps_all_filled <- rbind(data_steps_yes,data_steps_na_filled)
+nrow(data_steps_all_filled) == nrow(data)
+```
+
+
+
+
+# Histogram of the total number of steps taken each day after missing values are imputed
+```{r, echo=TRUE}
+data_steps_all_filled_s <- group_by(data_steps_all_filled, date)
+data_steps_all_filled_s <- summarise(data_steps_all_filled_s,sum_steps = sum(steps))
+data_steps_all_filled_s$date <- as.Date(data_steps_all_filled_s$date)
+
+ggplot(data_steps_all_filled_s,aes(x=date,y=sum_steps)) + 
+  geom_bar(colour="black", fill="#DD8888", width=.4,stat="identity") +
+  guides(fill=FALSE) +
+  xlab("Date") + ylab("Total Steps") +
+  ggtitle("Histogram")
+```
+
+
+
+# Calculate and report the mean and median total number of steps taken per day
+```{r, echo=TRUE}
+data_steps_all_filled_M <- group_by(data_steps_all_filled, date)
+data_steps_all_filled_M <- summarise(data_steps_all_filled_M,M_steps = mean(steps))
+data_steps_all_filled_M$date <- as.Date(data_steps_all_filled_M$date)
+
+data_steps_all_filled_MD <- group_by(data_steps_all_filled, date)
+data_steps_all_filled_MD <- summarise(data_steps_all_filled_MD,MD_steps = median(steps))
+data_steps_all_filled_MD$date <- as.Date(data_steps_all_filled_MD$date)
+
+Mean_original_dataset <- summary(data_steps_yes_perday_M)
+Median_original_dataset <- summary(data_steps_yes_perday_MD)
+
+Mean_filled_dataset <- summary(data_steps_all_filled_M)
+Median_filled_dataset <- summary(data_steps_all_filled_MD)
+
+
+```
+
+Interval with max number of steps is **`r data_steps_yes_interval_M_max[1]`**
+
+**Original dataset**
+
+**Mean:** `r Mean_original_dataset`
+**Median:** `r Median_original_dataset`
+
+**Filled-in dataset**
+
+**Mean:** `r Mean_filled_dataset`
+**Median:** `r Median_filled_dataset`
+
+No impact to mean values
+
+Median values are **higher** in filled-in dataset
+
+
+# Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+
+
+```{r, echo=TRUE}
+data_steps_all_filled_daytype <- transform(data_steps_all_filled,flag_weekend = (weekdays(as.Date(date)) %in% c('Saturday','Sunday')))
+data_steps_all_filled_Week <- data_steps_all_filled_daytype[data_steps_all_filled_daytype$flag_weekend==TRUE,]
+data_steps_all_filled_Weekend <- data_steps_all_filled_daytype[data_steps_all_filled_daytype$flag_weekend==FALSE,]
+
+
+data_steps_all_filled_Weekend_M <- group_by(data_steps_all_filled_Weekend, interval)
+data_steps_all_filled_Weekend_M <- summarise(data_steps_all_filled_Weekend_M,M_int = mean(steps))
+
+g1 <- ggplot(data_steps_all_filled_Weekend_M,aes(x=interval,y=M_int)) + 
+  geom_line(colour="gray55", linetype=1, size=1) + 
+  #geom_point(colour="green", size=1, shape=16) +
+  xlab("Interval") + ylab("Average Steps") +
+  ggtitle("Weekend") +
+  scale_y_continuous(limits = c(0, 250))
+
+
+
+data_steps_all_filled_Week_M <- group_by(data_steps_all_filled_Week, interval)
+data_steps_all_filled_Week_M <- summarise(data_steps_all_filled_Week_M,M_int = mean(steps))
+
+g2<- ggplot(data_steps_all_filled_Week_M,aes(x=interval,y=M_int)) + 
+  geom_line(colour="gray55", linetype=1, size=1) + 
+  #geom_point(colour="green", size=1, shape=16) +
+  xlab("Interval") + ylab("Average Steps") +
+  ggtitle("Weekdays") +
+  scale_y_continuous(limits = c(0, 250))
+
+multiplot(g1,g2, cols=2)
+```
+
+  
